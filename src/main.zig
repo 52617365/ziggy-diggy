@@ -2,7 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
-const parser = @import("parser.zig");
+const parser = @import("parser.zig").Parser;
 
 const Position = struct {
     line: u32,
@@ -57,8 +57,10 @@ pub fn main() !void {
     };
     defer file_contents.deinit();
 
-    var p = parser.GetParser(args[1], file_contents, gpa);
-    defer p.tokens.deinit();
+    var p = parser.InitParser(args[1], file_contents, gpa);
+    defer parser.DeInitParser(&p);
+
+    //parser.lex_tokens(&p);
 
     std.debug.print("[?] Initialized parser with file path: {s}\n", .{p.operatedFilePath});
 }
