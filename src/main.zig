@@ -4,37 +4,6 @@ const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
 const parser = @import("parser.zig").Parser;
 
-const Position = struct {
-    line: u32,
-    pos: u32,
-};
-const Parser = struct {
-    pos: Position,
-    operatedFilePath: []u8,
-    operatedFileContents: std.ArrayList(u8),
-};
-
-const LexToken = struct {
-    pos: Position,
-    token: Token,
-};
-
-// Tokens for markdown
-const Token = enum {
-    Heading,
-    Paragraph,
-    Bold,
-    Italic,
-    Link,
-};
-
-pub fn LexTokensFromMarkdown(p: *Parser) []LexToken {
-    _ = p;
-    var tokens: []LexToken = undefined;
-
-    return tokens;
-}
-
 pub fn main() !void {
     var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
 
@@ -57,10 +26,14 @@ pub fn main() !void {
     };
     defer file_contents.deinit();
 
-    var p = parser.InitParser(args[1], file_contents, gpa);
+    var p = parser.InitParser(args[1], &file_contents, gpa);
     defer parser.DeInitParser(&p);
 
-    //parser.lex_tokens(&p);
+    try parser.parse(&p);
+
+    for (p.tokens.items) |token| {
+        std.debug.print("{}\n", .{token});
+    }
 
     std.debug.print("[?] Initialized parser with file path: {s}\n", .{p.operatedFilePath});
 }
