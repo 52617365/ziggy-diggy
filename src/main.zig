@@ -2,7 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
-const parser_utils = @import("parser.zig");
+const parser_utils = @import("lex.zig");
 const format = std.fmt;
 
 pub fn main() !void {
@@ -33,7 +33,7 @@ pub fn main() !void {
     var parser = format.Parser{ .buf = file_contents.items };
 
     var tokens = std.ArrayList(parser_utils.LexToken).init(gpa);
-    parser_utils.parse(&parser, &tokens) catch |err| {
+    parser_utils.get_tokens(&parser, &tokens) catch |err| {
         if (err == error.EndOfStream) {
             std.debug.print("[+] Successfully parsed the file.\n", .{});
         }

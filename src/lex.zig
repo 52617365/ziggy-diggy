@@ -8,7 +8,7 @@ var col: u64 = 0;
 // This variable is only used when the debug_msg flag is set to true when compiling the program.
 var parse_call_counter: u64 = 0;
 
-pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
+pub fn get_tokens(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
     if (build_option.debug_msg) {
         parse_call_counter += 1;
     }
@@ -34,7 +34,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("\n"),
             .token = LexTokens.LineBreak,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == ' ') {
         try tokens.append(LexToken{
             .line = line,
@@ -42,7 +42,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast(" "),
             .token = LexTokens.Space,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '#') {
         try tokens.append(LexToken{
             .line = line,
@@ -50,7 +50,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("#"),
             .token = LexTokens.Hashtag,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '*') {
         try tokens.append(LexToken{
             .line = line,
@@ -58,7 +58,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("*"),
             .token = LexTokens.Asterisk,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '[') {
         try tokens.append(LexToken{
             .line = line,
@@ -66,7 +66,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("["),
             .token = LexTokens.BracketOpen,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == ']') {
         try tokens.append(LexToken{
             .line = line,
@@ -74,7 +74,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("]"),
             .token = LexTokens.BracketClose,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '`') {
         try tokens.append(LexToken{
             .line = line,
@@ -82,7 +82,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("`"),
             .token = LexTokens.Backtick,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '<') {
         try tokens.append(LexToken{
             .line = line,
@@ -90,7 +90,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast("<"),
             .token = LexTokens.SmallerThan,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (char.? == '>') {
         try tokens.append(LexToken{
             .line = line,
@@ -98,7 +98,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast(">"),
             .token = LexTokens.LargerThan,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     } else if (is_unicode_identifier(char.?) or is_number(char.?)) {
         var start_pos = parser.pos;
 
@@ -124,7 +124,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .contents = @constCast(parser.buf[start_pos - 1 .. end_pos]),
             .token = LexTokens.Identifier,
         });
-        try parse(parser, tokens);
+        try get_tokens(parser, tokens);
     }
 }
 
