@@ -7,8 +7,6 @@ var stream_index: u64 = 0;
 // These two variables are used to store the start and end of the token.
 var line_end: u64 = 0;
 var col_end: u64 = 0;
-//
-
 pub const Parser = struct {
     line: u64,
     col: u64,
@@ -100,10 +98,11 @@ pub const Parser = struct {
                 LexToken{
                     .line = get_position(line, line_end),
                     .col = get_position(col, col_end),
-                    .contents = p.operatedFileContents.items[start_index - 1..end_index],
+                    .contents = p.operatedFileContents.items[start_index - 1 .. end_index],
                     .token = LexTokens.Identifier,
                 },
             );
+            try parse(p);
         }
     }
 
@@ -185,7 +184,7 @@ pub const Parser = struct {
     }
 };
 
-const LexToken = struct {
+pub const LexToken = struct {
     line: Position,
     col: Position,
     contents: []u8,
@@ -199,7 +198,7 @@ const Position = struct {
 };
 
 // Tokens used in the lexical analysis phase.
-const LexTokens = enum {
+pub const LexTokens = enum {
     Heading,
     Identifier,
     Paragraph,

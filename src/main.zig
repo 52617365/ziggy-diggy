@@ -2,7 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
-const parser = @import("parser.zig").Parser;
+const parser = @import("parser.zig");
 
 pub fn main() !void {
     var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
@@ -26,15 +26,26 @@ pub fn main() !void {
     };
     defer file_contents.deinit();
 
-    var p = parser.InitParser(args[1], &file_contents, gpa);
-    defer parser.DeInitParser(&p);
+    var p = parser.Parser.InitParser(args[1], &file_contents, gpa);
+    defer parser.Parser.DeInitParser(&p);
 
-    try parser.parse(&p);
+    parser.Parser.parse(&p) catch |err| {
+        if (err == error.EndOfStream) {
+            std.debug.print("[+] Successfully parsed the file.\n", .{});
+        }
+    };
 
     for (p.tokens.items) |token| {
-        std.debug.print("{}\n", .{token});
-        std.debug.print("{s}\n", .{token.contents});
+        print_helper(&token);
     }
 
     std.debug.print("[?] Initialized parser with file path: {s}\n", .{p.operatedFilePath});
+}
+
+fn print_helper(token: *const parser.LexToken) void {
+    if (token.token == parser.LexTokens.EOF) {
+        std.debug.print("EOF reached at line {}, col: {}\n", .{ token.line.end, token.col.end });
+        return;
+    }
+    std.debug.print("line: {}:{}, col: {}:{}, contents: {s}, tokenType: {}\n", .{ token.line.start, token.line.end, token.col.start, token.col.end, token.contents, token.token });
 }
