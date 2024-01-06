@@ -24,6 +24,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const debug_msg = b.option(bool, "debug_msg", "Enable debugging messages in the program") orelse false;
+
+    const options = b.addOptions();
+    options.addOption(bool, "debug_msg", debug_msg);
+
+    exe.addOptions("config", options);
+
+    //exe.root.addOptions("config", build_options);
+    //
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
