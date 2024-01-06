@@ -25,6 +25,7 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
     }
 
     if (char.? == '\n') {
+        // A lot of stuff can only happen after a new line in markdown so this will hold a lot of peaking shit.
         line += 1;
         col = 0;
         try tokens.append(LexToken{
@@ -42,7 +43,63 @@ pub fn parse(parser: *format.Parser, tokens: *std.ArrayList(LexToken)) !void {
             .token = LexTokens.Space,
         });
         try parse(parser, tokens);
-    } else if (is_unicode_identifier(char.?)) {
+    } else if (char.? == '#') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("#"),
+            .token = LexTokens.Hashtag,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == '*') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("*"),
+            .token = LexTokens.Asterisk,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == '[') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("["),
+            .token = LexTokens.BracketOpen,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == ']') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("]"),
+            .token = LexTokens.BracketClose,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == '`') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("`"),
+            .token = LexTokens.Backtick,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == '<') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast("<"),
+            .token = LexTokens.SmallerThan,
+        });
+        try parse(parser, tokens);
+    } else if (char.? == '>') {
+        try tokens.append(LexToken{
+            .line = line,
+            .col = col,
+            .contents = @constCast(">"),
+            .token = LexTokens.LargerThan,
+        });
+        try parse(parser, tokens);
+    } else if (is_unicode_identifier(char.?) or is_number(char.?)) {
         var start_pos = parser.pos;
 
         while (true) {
@@ -157,13 +214,15 @@ pub const LexToken = struct {
 
 // Tokens used in the lexical analysis phase.
 pub const LexTokens = enum {
-    Heading,
     Identifier,
-    Paragraph,
-    Bold,
-    Italic,
-    Link,
     EOF,
     LineBreak,
     Space,
+    Hashtag, // #
+    Asterisk, // *
+    BracketOpen, // [
+    BracketClose, // ]
+    Backtick, // `
+    SmallerThan, // <
+    LargerThan, // >
 };

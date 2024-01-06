@@ -42,24 +42,4 @@ pub fn main() !void {
     for (tokens.items) |token| {
         std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
     }
-
-    //    parser.Parser.parse(&p) catch |err| {
-    //        if (err == error.EndOfStream) {
-    //            //std.debug.print("[+] Successfully parsed the file.\n", .{});
-    //        }
-    //    };
-    //
-    //    for (p.tokens.items) |token| {
-    //        std.debug.print("Token: {any}\n", .{token});
-    //        // print_helper(&token);
-    //    }
-    //std.debug.print("Tokens: {any}\n", .{p.tokens.items});
 }
-
-// fn print_helper(token: *const parser.LexToken) void {
-//     if (token.token == parser.LexTokens.EOF) {
-//         std.debug.print("EOF reached at line {}, col: {}\n", .{ token.line.end, token.col.end });
-//         return;
-//     }
-//     std.debug.print("line: {}:{}, col: {}:{}, contents: {s}, tokenType: {}\n", .{ token.line.start, token.line.end, token.col.start, token.col.end, token.contents, token.token });
-// }
