@@ -54,9 +54,13 @@ pub const Parser = struct {
         }
     }
 
+    fn update_line_and_column() void {
+        line = line_end;
+        col = col_end;
+    }
+
     pub fn parse(p: *Parser) !void {
-        defer line = line_end;
-        defer col = col_end;
+        defer update_line_and_column();
 
         var char = try read_next_char(p);
 
@@ -83,10 +87,7 @@ pub const Parser = struct {
 
             var temp_char: u8 = try read_next_char(p);
             while (true) {
-                if (!is_unicode_identifier(temp_char)) {
-                    break;
-                }
-                if (!is_number(temp_char)) {
+                if (!is_unicode_identifier(temp_char) and !is_number(temp_char)) {
                     break;
                 }
 
@@ -99,7 +100,7 @@ pub const Parser = struct {
                 LexToken{
                     .line = get_position(line, line_end),
                     .col = get_position(col, col_end),
-                    .contents = p.operatedFileContents.items[start_index..end_index],
+                    .contents = p.operatedFileContents.items[start_index - 1..end_index],
                     .token = LexTokens.Identifier,
                 },
             );

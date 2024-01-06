@@ -33,6 +33,7 @@ pub fn main() !void {
 
     for (p.tokens.items) |token| {
         std.debug.print("{}\n", .{token});
+        std.debug.print("{s}\n", .{token.contents});
     }
 
     std.debug.print("[?] Initialized parser with file path: {s}\n", .{p.operatedFilePath});
