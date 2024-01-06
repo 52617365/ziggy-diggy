@@ -27,12 +27,11 @@ pub fn main() !void {
     };
     defer file_contents.deinit();
 
-    // var p = parser.Parser.InitParser(args[1], &file_contents, gpa);
-    // defer parser.Parser.DeInitParser(&p);
-
     var parser = format.Parser{ .buf = file_contents.items };
 
     var tokens = std.ArrayList(parser_utils.LexToken).init(gpa);
+    defer tokens.deinit();
+
     parser_utils.get_tokens(&parser, &tokens) catch |err| {
         if (err == error.EndOfStream) {
             std.debug.print("[+] Successfully parsed the file.\n", .{});
@@ -42,4 +41,7 @@ pub fn main() !void {
     for (tokens.items) |token| {
         std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
     }
+
+    // TODO: Do a second iteration on the tokens to form a better understanding of the structure.
+    // For example, headers, italic, bold, etc texts.
 }
