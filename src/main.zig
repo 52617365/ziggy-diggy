@@ -30,7 +30,9 @@ pub fn main() !void {
     var parser = LLparser{ .buf = file_contents.items };
 
     var tokens = std.ArrayList(parser_utils.LowLevelLexToken).init(gpa);
+    var hlTokens = std.ArrayList(parser_utils.HighLevelLexToken).init(gpa);
     defer tokens.deinit();
+    defer hlTokens.deinit();
 
     parser_utils.get_tokens(&parser, &tokens) catch |err| {
         if (err == error.EndOfStream) {
@@ -39,6 +41,15 @@ pub fn main() !void {
     };
 
     for (tokens.items) |token| {
+        std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
+    }
+
+    var low_level_tokens_parser = parser_utils.llTokenParser{ .buf = tokens.items };
+
+    // TODO: why is this not working correctly, it's not doing anything.
+    try parser_utils.traverse_and_form_high_level_tokens(&hlTokens, &low_level_tokens_parser);
+
+    for (hlTokens.items) |token| {
         std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
     }
 

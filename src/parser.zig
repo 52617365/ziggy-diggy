@@ -52,21 +52,14 @@ pub fn get_parser_type(comptime t: type) type {
 }
 
 const llParser = get_parser_type(u8);
-const hlParser = get_parser_type(LowLevelLexToken);
+pub const llTokenParser = get_parser_type(LowLevelLexToken);
 
 pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !void {
     if (build_option.debug_msg) {
         parse_call_counter += 1;
-
-        //      if (parser.buf[parser.pos - 1] == '|') {
-        //          std.debug.print("peekaboo got |", .{});
-        //      }
     }
 
     var char = parser.char();
-    //  if (char == '|') {
-    //      std.debug.print("peekaboo got |", .{});
-    //  }
     if (char == null) {
         try tokens.append(LowLevelLexToken{
             .line = line,
@@ -289,13 +282,13 @@ pub const LowLevelTokens = enum {
 };
 
 pub const HighLevelTokens = enum {
-    Text,
     Heading1,
     Heading2,
     Heading3,
     Heading4,
     Heading5,
     Heading6,
+    Text,
     Emphasis,
     List,
     Image,
@@ -315,8 +308,104 @@ pub const HighLevelLexToken = struct {
 /// traverse_tokens() is used to iterate the tokens and form a new kind of token that represents a higher level view of markdown.
 /// This is done because it's easier to generate a higher representation when E.g. identifiers are one token instead of 10 different
 /// individual characters.
-pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelTokens), low_level_tokens_parser: *llParser) void {
+/// TODO: in the caller, catch the error.EndOfStream and in that case append EOF to the end of the high tokens
+/// do this because we don't want to handle it 100 times in this function.
+pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser) !void {
     var token = low_level_tokens_parser.char();
-    _ = token;
-    _ = highTokens;
+
+    if (token == null) {
+        try highTokens.append(HighLevelLexToken{
+            .line = line,
+            .col = col,
+            .contents = "",
+            .token = HighLevelTokens.EOF,
+        });
+        return error.EndOfStream;
+    }
+    // TODO: define headers first.
+    if (token.?.token == LowLevelTokens.LineBreak) {
+        var start_pos = low_level_tokens_parser.pos;
+
+        var potential_header = false;
+        _ = potential_header;
+
+        var peeked_char = low_level_tokens_parser.peek(1);
+        if (peeked_char == null) {
+            try highTokens.append(HighLevelLexToken{
+                .line = line,
+                .col = col,
+                .contents = "",
+                .token = HighLevelTokens.EOF,
+            });
+            return error.EndOfStream;
+        }
+        if (peeked_char.?.token == LowLevelTokens.Hashtag) {
+            var header_count: u64 = undefined;
+
+            var tmp_chr = low_level_tokens_parser.char();
+            while (true) {
+                if (tmp_chr == null) {
+                    try highTokens.append(HighLevelLexToken{
+                        .line = line,
+                        .col = col,
+                        .contents = "",
+                        .token = HighLevelTokens.EOF,
+                    });
+                    return error.EndOfStream;
+                }
+                if (tmp_chr.?.token == LowLevelTokens.Hashtag) {
+                    header_count += 1;
+                }
+                tmp_chr = low_level_tokens_parser.char();
+            }
+            if (header_count > 6) {
+                // traverse to the end with identifiers.
+                // TODO: Combine texts if they're text etc.
+                var next_char = low_level_tokens_parser.char();
+                if (next_char == null) {
+                    try highTokens.append(HighLevelLexToken{
+                        .line = line,
+                        .col = col,
+                        .contents = "",
+                        .token = HighLevelTokens.EOF,
+                    });
+                    return error.EndOfStream;
+                }
+
+                if (low_level_tokens_parser.char())
+                    try highTokens.append(HighLevelLexToken{
+                        .line = line,
+                        .col = col,
+                        .contents = low_level_tokens_parser.buf[start_pos..low_level_tokens_parser.pos],
+                        .token = HighLevelTokens.Text,
+                    });
+                try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser);
+            } else {
+                if (low_level_tokens_parser.peek(1) == LowLevelTokens.Space) {
+                    // Found a heading.
+
+                    var type_of_heading = undefined;
+                    if (header_count == 1) {
+                        type_of_heading = HighLevelTokens.Heading1;
+                    } else if (header_count == 2) {
+                        type_of_heading = HighLevelTokens.Heading2;
+                    } else if (header_count == 3) {
+                        type_of_heading = HighLevelTokens.Heading3;
+                    } else if (header_count == 4) {
+                        type_of_heading = HighLevelTokens.Heading4;
+                    } else if (header_count == 5) {
+                        type_of_heading = HighLevelTokens.Heading5;
+                    } else if (header_count == 6) {
+                        type_of_heading = HighLevelTokens.Heading6;
+                    }
+
+                    // Traversing to the actual heading text.
+                    low_level_tokens_parser.pos += 2;
+
+                    var heading_text = low_level_tokens_parser.until(LowLevelLexToken.LineBreak);
+                    try highTokens.append(HighLevelLexToken{ .line = line, .col = col, .contents = heading_text, .token = type_of_heading });
+                }
+            }
+        }
+    }
 }
