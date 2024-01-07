@@ -2,8 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
-const parser_utils = @import("lex.zig");
-const format = std.fmt;
+const parser_utils = @import("parser.zig");
 
 pub fn main() !void {
     std.debug.print("\n", .{});
@@ -27,9 +26,10 @@ pub fn main() !void {
     };
     defer file_contents.deinit();
 
-    var parser = format.Parser{ .buf = file_contents.items };
+    const LLparser = parser_utils.get_parser_type(u8);
+    var parser = LLparser{ .buf = file_contents.items };
 
-    var tokens = std.ArrayList(parser_utils.LexToken).init(gpa);
+    var tokens = std.ArrayList(parser_utils.LowLevelLexToken).init(gpa);
     defer tokens.deinit();
 
     parser_utils.get_tokens(&parser, &tokens) catch |err| {
