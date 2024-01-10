@@ -310,7 +310,7 @@ pub const HighLevelLexToken = struct {
 /// individual characters.
 /// TODO: in the caller, catch the error.EndOfStream and in that case append EOF to the end of the high tokens
 /// do this because we don't want to handle it 100 times in this function.
-pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser) !void {
+pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser, gpa: std.mem.Allocator) !void {
     var token = low_level_tokens_parser.char();
 
     if (token == null) {
@@ -407,5 +407,36 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                 }
             }
         }
+    } else if (token.?.token == LowLevelTokens.Identifier) {
+        // TODO: collect all identifiers after this to one Text high level token.
+        var combined_texts = std.ArrayList(u8).init(gpa);
+
+        try combined_texts.appendSlice(token.?.contents);
+
+        while (true) {
+            var iterated_token = low_level_tokens_parser.char();
+
+            if (iterated_token == null) {
+                low_level_tokens_parser.pos -= 1; // Going back one in position so that the next iteration will handle EOF.
+                try highTokens.append(HighLevelLexToken{
+                    .col = col,
+                    .line = line,
+                    .contents = try combined_texts.toOwnedSlice(),
+                    .token = HighLevelTokens.Text,
+                });
+            }
+
+            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.LineBreak) {
+                try combined_texts.appendSlice(iterated_token.?.contents);
+            } else {
+                break;
+            }
+        }
+        try highTokens.append(HighLevelLexToken{
+            .col = col,
+            .line = line,
+            .contents = try combined_texts.toOwnedSlice(),
+            .token = HighLevelTokens.Text,
+        });
     }
 }
