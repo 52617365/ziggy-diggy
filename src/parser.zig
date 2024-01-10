@@ -426,7 +426,7 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                 });
             }
 
-            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.LineBreak) {
+            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.LineBreak or iterated_token.?.token == LowLevelTokens.Space) {
                 try combined_texts.appendSlice(iterated_token.?.contents);
             } else {
                 break;
@@ -438,5 +438,6 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
             .contents = try combined_texts.toOwnedSlice(),
             .token = HighLevelTokens.Text,
         });
+        try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser, gpa);
     }
 }
