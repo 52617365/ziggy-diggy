@@ -333,10 +333,10 @@ pub const HighLevelTokens = enum {
 };
 
 pub const HighLevelLexToken = struct {
-    // start_line: u64,
-    // start_col: u64,
-    col: u64,
-    line: u64,
+    start_col: u64,
+    end_col: u64,
+    start_line: u64,
+    end_line: u64,
     contents: []u8,
     token: HighLevelTokens,
     // ll_token: []LowLevelTokens,
@@ -350,12 +350,15 @@ pub const HighLevelLexToken = struct {
 pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser, gpa: std.mem.Allocator) !void {
     var token = low_level_tokens_parser.char();
 
+    var token_start_line = token.?.start_line;
+    var token_start_col = token.?.start_col;
+
     if (token.?.token == LowLevelTokens.EOF) {
         try highTokens.append(HighLevelLexToken{
-            // .start_col = col - 1,
-            // .start_line = line,
-            .col = col,
-            .line = line,
+            .start_col = token_start_col,
+            .start_line = token_start_line,
+            .end_col = token_start_col + 1,
+            .end_line = token_start_line,
             .contents = "",
             .token = HighLevelTokens.EOF,
         });
@@ -376,6 +379,13 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
             if (header_count > 6) { // Markdown can't have headings that are larger than 6 hashtags.
                 var combined_texts = std.ArrayList(u8).init(gpa);
                 // In this block it's text, so make sure that you go till the end of text.
+
+                // Adding the hashtags as text into the combined_texts
+                var header_count_copy = header_count;
+                while (header_count_copy > 0) : (header_count_copy -= 1) {
+                    try combined_texts.append('#');
+                }
+
                 while (low_level_tokens_parser.pos < low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
                     if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token != LowLevelTokens.Identifier) {
                         break;
@@ -384,8 +394,10 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                     }
                 }
                 try highTokens.append(HighLevelLexToken{
-                    .line = line,
-                    .col = col,
+                    .start_line = token_start_line,
+                    .start_col = token_start_col,
+                    .end_line = low_level_tokens_parser.peek(0).?.end_line,
+                    .end_col = low_level_tokens_parser.peek(0).?.end_col,
                     .contents = try combined_texts.toOwnedSlice(),
                     .token = HighLevelTokens.Text,
                 });
@@ -422,7 +434,7 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                         }
                     }
 
-                    try highTokens.append(HighLevelLexToken{ .line = line, .col = col, .contents = try combined_texts.toOwnedSlice(), .token = type_of_heading });
+                    try highTokens.append(HighLevelLexToken{ .start_line = token_start_line, .start_col = token_start_col, .end_line = low_level_tokens_parser.peek(0).?.end_line, .end_col = low_level_tokens_parser.peek(0).?.end_col, .contents = try combined_texts.toOwnedSlice(), .token = type_of_heading });
                 } else {
                     // TODO: If it's not a space, it's text.
                 }
@@ -443,11 +455,11 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
 
             if (iterated_token.?.token == LowLevelTokens.EOF) {
                 low_level_tokens_parser.pos -= 1; // Going back one in position so that the next iteration will handle EOF.
-                var end_col_of_identifier = iterated_token.?.end_col;
-                var end_line_of_identifier = iterated_token.?.end_line;
                 try highTokens.append(HighLevelLexToken{
-                    .col = end_col_of_identifier,
-                    .line = end_line_of_identifier,
+                    .start_col = token_start_col,
+                    .start_line = token_start_line,
+                    .end_col = low_level_tokens_parser.peek(0).?.end_col,
+                    .end_line = low_level_tokens_parser.peek(0).?.end_line,
                     .contents = try combined_texts.toOwnedSlice(),
                     .token = HighLevelTokens.Text,
                 });
@@ -459,12 +471,11 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                 break;
             }
         }
-        var current_location = low_level_tokens_parser.peek(0);
-        var end_col_of_identifier = current_location.?.end_col;
-        var end_line_of_identifier = current_location.?.end_line;
         try highTokens.append(HighLevelLexToken{
-            .col = end_col_of_identifier,
-            .line = end_line_of_identifier,
+            .start_col = token_start_col,
+            .start_line = token_start_line,
+            .end_col = low_level_tokens_parser.peek(0).?.end_col,
+            .end_line = low_level_tokens_parser.peek(0).?.end_line,
             .contents = try combined_texts.toOwnedSlice(),
             .token = HighLevelTokens.Text,
         });
