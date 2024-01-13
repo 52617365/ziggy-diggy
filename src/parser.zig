@@ -7,6 +7,9 @@ var col: u64 = 0;
 // This variable is only used when the debug_msg flag is set to true when compiling the program.
 var parse_call_counter: u64 = 0;
 
+// @Performance: we could instead of having only buf in this struct, have a text_buf that contains the raw data in u8
+// It would allow us to be able to get slices from the original text_buf instead of allocating dynamic arrays.
+// to gather the individual strings from many strings to one array.
 pub fn get_parser_type(comptime t: type) type {
     return struct {
         buf: []const t,
@@ -31,6 +34,7 @@ pub fn get_parser_type(comptime t: type) type {
             if (self.pos < self.buf.len) {
                 const ch = self.buf[self.pos];
                 self.pos += 1;
+                col += 1;
                 return ch;
             }
             return null;
@@ -58,12 +62,16 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
     if (build_option.debug_msg) {
         parse_call_counter += 1;
     }
+    var start_line = line;
+    var start_col = col;
 
     var char = parser.char();
     if (char == null) {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = "",
             .token = LowLevelTokens.EOF,
         });
@@ -74,72 +82,90 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
         line += 1;
         col = 0;
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
-            .contents = @constCast("\n"),
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
+            .contents = @constCast("\\n"),
             .token = LowLevelTokens.LineBreak,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == ' ') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast(" "),
             .token = LowLevelTokens.Space,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '#') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("#"),
             .token = LowLevelTokens.Hashtag,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '*') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("*"),
             .token = LowLevelTokens.Asterisk,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '[') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("["),
             .token = LowLevelTokens.BracketOpen,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == ']') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("]"),
             .token = LowLevelTokens.BracketClose,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '`') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("`"),
             .token = LowLevelTokens.Backtick,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '<') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("<"),
             .token = LowLevelTokens.SmallerThan,
         });
         try get_tokens(parser, tokens);
     } else if (char.? == '>') {
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast(">"),
             .token = LowLevelTokens.LargerThan,
         });
@@ -148,10 +174,12 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
         }
         try get_tokens(parser, tokens);
     } else if (char.? == '|') {
-        std.debug.print("peekaboo got |", .{});
+        //std.debug.print("peekaboo got |", .{});
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast("|"),
             .token = LowLevelTokens.Pipe,
         });
@@ -167,13 +195,16 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
             }
 
             parser.pos += 1;
+            col += 1;
         }
 
         var end_pos = parser.pos;
 
         try tokens.append(LowLevelLexToken{
-            .line = line,
-            .col = col,
+            .start_line = start_line,
+            .end_line = line,
+            .start_col = start_col,
+            .end_col = col,
             .contents = @constCast(parser.buf[start_pos - 1 .. end_pos]),
             .token = LowLevelTokens.Identifier,
         });
@@ -258,9 +289,12 @@ fn is_unicode_identifier_or_number(c: ?u8) bool {
 
     return is_unicode_identifier(c.?) and is_number(c.?);
 }
+
 pub const LowLevelLexToken = struct {
-    line: u64,
-    col: u64,
+    start_line: u64,
+    start_col: u64,
+    end_line: u64,
+    end_col: u64,
     contents: []u8,
     token: LowLevelTokens,
 };
@@ -299,13 +333,16 @@ pub const HighLevelTokens = enum {
 };
 
 pub const HighLevelLexToken = struct {
-    line: u64,
+    // start_line: u64,
+    // start_col: u64,
     col: u64,
+    line: u64,
     contents: []u8,
     token: HighLevelTokens,
+    // ll_token: []LowLevelTokens,
 };
 
-/// traverse_tokens() is used to iterate the tokens and form a new kind of token that represents a higher level view of markdown.
+/// traverse_and_form_high_level_tokens() is used to iterate the tokens and form a new kind of token that represents a higher level view of markdown.
 /// This is done because it's easier to generate a higher representation when E.g. identifiers are one token instead of 10 different
 /// individual characters.
 /// TODO: in the caller, catch the error.EndOfStream and in that case append EOF to the end of the high tokens
@@ -313,78 +350,51 @@ pub const HighLevelLexToken = struct {
 pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser, gpa: std.mem.Allocator) !void {
     var token = low_level_tokens_parser.char();
 
-    if (token == null) {
+    if (token.?.token == LowLevelTokens.EOF) {
         try highTokens.append(HighLevelLexToken{
-            .line = line,
+            // .start_col = col - 1,
+            // .start_line = line,
             .col = col,
+            .line = line,
             .contents = "",
             .token = HighLevelTokens.EOF,
         });
         return error.EndOfStream;
     }
-    // TODO: define headers first.
     if (token.?.token == LowLevelTokens.LineBreak) {
-        var start_pos = low_level_tokens_parser.pos;
+        var next_token = low_level_tokens_parser.char();
+        if (next_token.?.token == LowLevelTokens.Hashtag) {
+            var header_count: u64 = 0;
 
-        var potential_header = false;
-        _ = potential_header;
-
-        var peeked_char = low_level_tokens_parser.peek(1);
-        if (peeked_char == null) {
-            try highTokens.append(HighLevelLexToken{
-                .line = line,
-                .col = col,
-                .contents = "",
-                .token = HighLevelTokens.EOF,
-            });
-            return error.EndOfStream;
-        }
-        if (peeked_char.?.token == LowLevelTokens.Hashtag) {
-            var header_count: u64 = undefined;
-
-            var tmp_chr = low_level_tokens_parser.char();
-            while (true) {
-                if (tmp_chr == null) {
-                    try highTokens.append(HighLevelLexToken{
-                        .line = line,
-                        .col = col,
-                        .contents = "",
-                        .token = HighLevelTokens.EOF,
-                    });
-                    return error.EndOfStream;
-                }
-                if (tmp_chr.?.token == LowLevelTokens.Hashtag) {
+            while (low_level_tokens_parser.pos > low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
+                if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token != LowLevelTokens.Hashtag) {
+                    break;
+                } else {
                     header_count += 1;
                 }
-                tmp_chr = low_level_tokens_parser.char();
             }
-            if (header_count > 6) {
-                // traverse to the end with identifiers.
-                // TODO: Combine texts if they're text etc.
-                var next_char = low_level_tokens_parser.char();
-                if (next_char == null) {
-                    try highTokens.append(HighLevelLexToken{
-                        .line = line,
-                        .col = col,
-                        .contents = "",
-                        .token = HighLevelTokens.EOF,
-                    });
-                    return error.EndOfStream;
+            if (header_count > 6) { // Markdown can't have headings that are larger than 6 hashtags.
+                var combined_texts = std.ArrayList(u8).init(gpa);
+                // In this block it's text, so make sure that you go till the end of text.
+                while (low_level_tokens_parser.pos < low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
+                    if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token != LowLevelTokens.Identifier) {
+                        break;
+                    } else {
+                        try combined_texts.appendSlice(low_level_tokens_parser.buf[low_level_tokens_parser.pos].contents);
+                    }
                 }
-
-                if (low_level_tokens_parser.char())
-                    try highTokens.append(HighLevelLexToken{
-                        .line = line,
-                        .col = col,
-                        .contents = low_level_tokens_parser.buf[start_pos..low_level_tokens_parser.pos],
-                        .token = HighLevelTokens.Text,
-                    });
-                try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser);
+                try highTokens.append(HighLevelLexToken{
+                    .line = line,
+                    .col = col,
+                    .contents = try combined_texts.toOwnedSlice(),
+                    .token = HighLevelTokens.Text,
+                });
+                try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser, gpa);
             } else {
-                if (low_level_tokens_parser.peek(1) == LowLevelTokens.Space) {
+                if (low_level_tokens_parser.peek(1).?.token == LowLevelTokens.Space) {
                     // Found a heading.
 
-                    var type_of_heading = undefined;
+                    var type_of_heading: HighLevelTokens = undefined;
                     if (header_count == 1) {
                         type_of_heading = HighLevelTokens.Heading1;
                     } else if (header_count == 2) {
@@ -402,13 +412,28 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
                     // Traversing to the actual heading text.
                     low_level_tokens_parser.pos += 2;
 
-                    var heading_text = low_level_tokens_parser.until(LowLevelLexToken.LineBreak);
-                    try highTokens.append(HighLevelLexToken{ .line = line, .col = col, .contents = heading_text, .token = type_of_heading });
+                    var combined_texts = std.ArrayList(u8).init(gpa);
+
+                    while (low_level_tokens_parser.pos < low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
+                        if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.LineBreak) {
+                            break;
+                        } else if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.Identifier or low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.Space) {
+                            try combined_texts.appendSlice(low_level_tokens_parser.buf[low_level_tokens_parser.pos].contents);
+                        }
+                    }
+
+                    try highTokens.append(HighLevelLexToken{ .line = line, .col = col, .contents = try combined_texts.toOwnedSlice(), .token = type_of_heading });
+                } else {
+                    // TODO: If it's not a space, it's text.
                 }
             }
-        }
+            // TODO: handle all the other possibilities that can happen only after new lines.
+            // } else if () {
+
+        } else {}
     } else if (token.?.token == LowLevelTokens.Identifier) {
         // TODO: collect all identifiers after this to one Text high level token.
+
         var combined_texts = std.ArrayList(u8).init(gpa);
 
         try combined_texts.appendSlice(token.?.contents);
@@ -416,25 +441,30 @@ pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelL
         while (true) {
             var iterated_token = low_level_tokens_parser.char();
 
-            if (iterated_token == null) {
+            if (iterated_token.?.token == LowLevelTokens.EOF) {
                 low_level_tokens_parser.pos -= 1; // Going back one in position so that the next iteration will handle EOF.
+                var end_col_of_identifier = iterated_token.?.end_col;
+                var end_line_of_identifier = iterated_token.?.end_line;
                 try highTokens.append(HighLevelLexToken{
-                    .col = col,
-                    .line = line,
+                    .col = end_col_of_identifier,
+                    .line = end_line_of_identifier,
                     .contents = try combined_texts.toOwnedSlice(),
                     .token = HighLevelTokens.Text,
                 });
             }
 
-            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.LineBreak or iterated_token.?.token == LowLevelTokens.Space) {
+            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.Space) {
                 try combined_texts.appendSlice(iterated_token.?.contents);
             } else {
                 break;
             }
         }
+        var current_location = low_level_tokens_parser.peek(0);
+        var end_col_of_identifier = current_location.?.end_col;
+        var end_line_of_identifier = current_location.?.end_line;
         try highTokens.append(HighLevelLexToken{
-            .col = col,
-            .line = line,
+            .col = end_col_of_identifier,
+            .line = end_line_of_identifier,
             .contents = try combined_texts.toOwnedSlice(),
             .token = HighLevelTokens.Text,
         });

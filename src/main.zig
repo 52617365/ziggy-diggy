@@ -2,6 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 const custom_errors = @import("my_custom_errors.zig");
 const file = @import("file.zig");
+const fmt = @import("std").fmt;
 const parser_utils = @import("parser.zig");
 
 pub fn main() !void {
@@ -40,22 +41,21 @@ pub fn main() !void {
         }
     };
 
-    //  for (tokens.items) |token| {
-    //      std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
-    //  }
+    std.debug.print("[+] Low level tokens:\n", .{});
+    for (tokens.items) |token| {
+        std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
+    }
 
     var low_level_tokens_parser = parser_utils.llTokenParser{ .buf = tokens.items };
 
     // TODO: why is this not working correctly, it's not doing anything.
     try parser_utils.traverse_and_form_high_level_tokens(&hlTokens, &low_level_tokens_parser, gpa);
 
+    std.debug.print("[+] High level tokens:\n", .{});
     for (hlTokens.items) |token| {
         std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
         if (token.token == parser_utils.HighLevelTokens.Text) {
             gpa.free(token.contents);
         }
     }
-
-    // TODO: Do a second iteration on the tokens to form a better understanding of the structure.
-    // For example, headers, italic, bold, etc texts.
 }

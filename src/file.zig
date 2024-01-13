@@ -14,6 +14,7 @@ pub fn LoadFileIntoMemory(filePath: []u8, allocator: std.mem.Allocator) !std.Arr
 
     while (try in_stream.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
         try fileContents.appendSlice(line);
+        try fileContents.append('\n');
     }
     if (fileContents.items.len == 0) {
         fileContents.deinit();
