@@ -1,10 +1,10 @@
-build:
+Build:
 	@zig build
 
 build-debug:
 	@zig build -Ddebug_msg=true
 
-run:
+Run:
 	@zig build run -- test.md
 
 run-debug:

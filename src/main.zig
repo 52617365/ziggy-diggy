@@ -11,16 +11,21 @@ pub fn main() !void {
 
     var gpa = general_purpose_allocator.allocator();
 
-    const args = try std.process.argsAlloc(gpa);
-
+    var args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
 
+    var file_name = std.ArrayList(u8).init(gpa);
+    defer file_name.deinit();
+
     if (args.len != 2) {
-        std.debug.print("Expected file in the first argument to the program.\n", .{});
-        return;
+        std.debug.print("Expected file in the first argument to the program. Setting it to test.md\n\n", .{});
+        // std.debug.print("For testing purposes, we are going to fill the args ourselves.\n", .{});
+        try file_name.appendSlice("test.md");
+    } else {
+        try file_name.appendSlice(args[1]);
     }
 
-    var file_contents = file.LoadFileIntoMemory(args[1], gpa) catch |err| {
+    var file_contents = file.LoadFileIntoMemory(file_name.items, gpa) catch |err| {
         var message = custom_errors.FetchCustomErrorMessage(err, custom_errors.AllCustomErrorMessages);
         std.debug.print("[-] {s}", .{message});
         return;
@@ -31,9 +36,7 @@ pub fn main() !void {
     var parser = LLparser{ .buf = file_contents.items };
 
     var tokens = std.ArrayList(parser_utils.LowLevelLexToken).init(gpa);
-    var hlTokens = std.ArrayList(parser_utils.HighLevelLexToken).init(gpa);
     defer tokens.deinit();
-    defer hlTokens.deinit();
 
     parser_utils.get_tokens(&parser, &tokens) catch |err| {
         if (err == error.EndOfStream) {
@@ -41,19 +44,14 @@ pub fn main() !void {
         }
     };
 
-    std.debug.print("[+] Low level tokens:\n", .{});
-    for (tokens.items) |token| {
-        std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
-    }
+    // std.debug.print("\n[+] Low level tokens:\n", .{});
+    // for (tokens.items) |token| {
+    //     std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
+    // }
+}
 
-    var low_level_tokens_parser = parser_utils.llTokenParser{ .buf = tokens.items };
-
-    // TODO: why is this not working correctly, it's not doing anything.
-    try parser_utils.traverse_and_form_high_level_tokens(&hlTokens, &low_level_tokens_parser, gpa);
-
-    std.debug.print("[+] High level tokens:\n", .{});
-    for (hlTokens.items) |token| {
-        std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
+fn free_high_level_tokens(gpa: std.mem.Allocator, tokens: []parser_utils.HighLevelLexToken) void {
+    for (tokens) |token| {
         if (token.token == parser_utils.HighLevelTokens.Text) {
             gpa.free(token.contents);
         }

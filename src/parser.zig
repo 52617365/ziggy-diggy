@@ -1,13 +1,9 @@
 const std = @import("std");
-const build_option = @import("config");
+const testing = std.testing;
+// const build_option = @import("config");
 
 var line: u64 = 0;
-var col: u64 = 0;
-
-// This variable is only used when the debug_msg flag is set to true when compiling the program.
-var parse_call_counter: u64 = 0;
-
-// @Performance: we could instead of having only buf in this struct, have a text_buf that contains the raw data in u8
+var col: u64 = 0; // This variable is only used when the debug_msg flag is set to true when compiling the program. var parse_call_counter: u64 = 0; // @Performance: we could instead of having only buf in this struct, have a text_buf that contains the raw data in u8
 // It would allow us to be able to get slices from the original text_buf instead of allocating dynamic arrays.
 // to gather the individual strings from many strings to one array.
 pub fn get_parser_type(comptime t: type) type {
@@ -59,134 +55,108 @@ const llParser = get_parser_type(u8);
 pub const llTokenParser = get_parser_type(LowLevelLexToken);
 
 pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !void {
-    if (build_option.debug_msg) {
-        parse_call_counter += 1;
-    }
     var start_line = line;
     var start_col = col;
 
     var char = parser.char();
     if (char == null) {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = "",
-            .token = LowLevelTokens.EOF,
-        });
+        try capture_token(tokens, @constCast(""), TokenTypes.EOF, start_line, start_col);
         return error.EndOfStream;
     }
 
     if (char.? == '\n') {
         line += 1;
         col = 0;
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("\\n"),
-            .token = LowLevelTokens.LineBreak,
-        });
+
+        var start_pos = parser.pos;
+        {
+            if (parser.peek(1) == '#') {
+                var heading_ahead = false;
+                var header_amount: u64 = 1;
+                var peek_amount: u64 = 1;
+                while (parser.peek(peek_amount) == '#') : (peek_amount += 1) {
+                    header_amount += 1;
+                }
+                if (header_amount <= 6 and parser.peek(peek_amount + 1) == ' ') {
+                    heading_ahead = true;
+                }
+
+                if (heading_ahead) {
+                    parser.pos += peek_amount;
+
+                    // @Copypasta
+                    var text_start_pos = parser.pos;
+
+                    while (true) {
+                        if (parser.pos >= parser.buf.len) break;
+
+                        if (!is_unicode_identifier(parser.buf[parser.pos]) and !is_number(parser.buf[parser.pos]) and !is_symbol(parser.buf[parser.pos])) {
+                            break;
+                        }
+
+                        parser.pos += 1;
+                        col += 1;
+                    }
+
+                    var end_pos = parser.pos;
+                    //
+
+                    std.debug.print("Found heading with {} hashtags. Contents of heading: {s}", .{ header_amount, parser.buf[text_start_pos..end_pos] });
+                } else {
+                    // @Copypasta
+                    while (true) {
+                        if (parser.pos >= parser.buf.len) break;
+
+                        if (!is_unicode_identifier(parser.buf[parser.pos]) and !is_number(parser.buf[parser.pos]) and !is_symbol(parser.buf[parser.pos])) {
+                            break;
+                        }
+
+                        parser.pos += 1;
+                        col += 1;
+                    }
+
+                    var end_pos = parser.pos;
+                    //
+                    std.debug.print("Found text with {} hashtags. Contents of text: {s}\n", .{ header_amount, parser.buf[start_pos..end_pos] });
+                    try capture_token(tokens, @constCast(parser.buf[start_pos..end_pos]), TokenTypes.Identifier, start_line, start_col);
+                }
+                // std.debug.print("Found hashtags, got {} hashtags. heading_ahead = {}\n", .{ header_amount, heading_ahead });
+            }
+        }
+
+        try capture_token(tokens, @constCast("\\n"), TokenTypes.LineBreak, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == ' ') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast(" "),
-            .token = LowLevelTokens.Space,
-        });
+        try capture_token(tokens, @constCast(" "), TokenTypes.Space, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '#') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("#"),
-            .token = LowLevelTokens.Hashtag,
-        });
+        try capture_token(tokens, @constCast("#"), TokenTypes.Hashtag, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '*') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("*"),
-            .token = LowLevelTokens.Asterisk,
-        });
+        try capture_token(tokens, @constCast("*"), TokenTypes.Asterisk, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '[') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("["),
-            .token = LowLevelTokens.BracketOpen,
-        });
+        try capture_token(tokens, @constCast("["), TokenTypes.BracketOpen, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == ']') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("]"),
-            .token = LowLevelTokens.BracketClose,
-        });
+        try capture_token(tokens, @constCast("]"), TokenTypes.BracketClose, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '`') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("`"),
-            .token = LowLevelTokens.Backtick,
-        });
+        try capture_token(tokens, @constCast("`"), TokenTypes.Backtick, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '<') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("<"),
-            .token = LowLevelTokens.SmallerThan,
-        });
+        try capture_token(tokens, @constCast("<"), TokenTypes.SmallerThan, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '>') {
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast(">"),
-            .token = LowLevelTokens.LargerThan,
-        });
-        if (build_option.debug_msg) {
-            std.debug.print("parser pos: {}\n", .{parser.pos});
-        }
+        try capture_token(tokens, @constCast(">"), TokenTypes.LargerThan, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (char.? == '|') {
-        //std.debug.print("peekaboo got |", .{});
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast("|"),
-            .token = LowLevelTokens.Pipe,
-        });
+        try capture_token(tokens, @constCast("|"), TokenTypes.Pipe, start_line, start_col);
         try get_tokens(parser, tokens);
     } else if (is_unicode_identifier(char.?) or is_number(char.?)) {
         var start_pos = parser.pos;
 
+        // @Copypasta
         while (true) {
             if (parser.pos >= parser.buf.len) break;
 
@@ -200,16 +170,20 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
 
         var end_pos = parser.pos;
 
-        try tokens.append(LowLevelLexToken{
-            .start_line = start_line,
-            .end_line = line,
-            .start_col = start_col,
-            .end_col = col,
-            .contents = @constCast(parser.buf[start_pos - 1 .. end_pos]),
-            .token = LowLevelTokens.Identifier,
-        });
+        try capture_token(tokens, @constCast(parser.buf[start_pos - 1 .. end_pos]), TokenTypes.Identifier, start_line, start_col);
         try get_tokens(parser, tokens);
     }
+}
+
+fn capture_token(tokens: *std.ArrayList(LowLevelLexToken), contents: []u8, tokenType: TokenTypes, start_line: u64, start_col: u64) !void {
+    try tokens.append(LowLevelLexToken{
+        .start_line = start_line,
+        .end_line = line,
+        .start_col = start_col,
+        .end_col = col,
+        .contents = contents,
+        .token = tokenType,
+    });
 }
 
 fn is_unicode_identifier(c: u8) bool {
@@ -274,10 +248,20 @@ fn is_unicode_identifier(c: u8) bool {
         'Ö' => return true,
         'Ä' => return true,
         'Å' => return true,
+        ' ' => return true,
         else => {
             return false;
         },
     }
+}
+
+fn is_symbol(c: u8) bool {
+    return switch (c) {
+        // Common symbols and special characters
+        '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{', '|', '}', '~' => true,
+        // Default case if none of the above
+        else => false,
+    };
 }
 
 fn is_number(c: u8) bool {
@@ -296,11 +280,11 @@ pub const LowLevelLexToken = struct {
     end_line: u64,
     end_col: u64,
     contents: []u8,
-    token: LowLevelTokens,
+    token: TokenTypes,
 };
 
 // Tokens used in the lexical analysis phase.
-pub const LowLevelTokens = enum {
+pub const TokenTypes = enum {
     Identifier,
     EOF,
     LineBreak,
@@ -315,170 +299,24 @@ pub const LowLevelTokens = enum {
     Pipe, // |
 };
 
-pub const HighLevelTokens = enum {
-    Heading1,
-    Heading2,
-    Heading3,
-    Heading4,
-    Heading5,
-    Heading6,
-    Text,
-    Emphasis,
-    List,
-    Image,
-    Code, // #
-    Table, // *
-    Blockquote, // [
-    EOF,
-};
+test "test build low level tokens" {
+    var testing_allocator = std.testing.allocator;
 
-pub const HighLevelLexToken = struct {
-    start_col: u64,
-    end_col: u64,
-    start_line: u64,
-    end_line: u64,
-    contents: []u8,
-    token: HighLevelTokens,
-    // ll_token: []LowLevelTokens,
-};
+    var file_contents = std.ArrayList(u8).init(testing_allocator);
+    defer file_contents.deinit();
 
-/// traverse_and_form_high_level_tokens() is used to iterate the tokens and form a new kind of token that represents a higher level view of markdown.
-/// This is done because it's easier to generate a higher representation when E.g. identifiers are one token instead of 10 different
-/// individual characters.
-/// TODO: in the caller, catch the error.EndOfStream and in that case append EOF to the end of the high tokens
-/// do this because we don't want to handle it 100 times in this function.
-pub fn traverse_and_form_high_level_tokens(highTokens: *std.ArrayList(HighLevelLexToken), low_level_tokens_parser: *llTokenParser, gpa: std.mem.Allocator) !void {
-    var token = low_level_tokens_parser.char();
+    try file_contents.appendSlice(@constCast("Hello_world_identifier_token"));
 
-    var token_start_line = token.?.start_line;
-    var token_start_col = token.?.start_col;
+    const LLparser = get_parser_type(u8);
+    var parser = LLparser{ .buf = file_contents.items };
 
-    if (token.?.token == LowLevelTokens.EOF) {
-        try highTokens.append(HighLevelLexToken{
-            .start_col = token_start_col,
-            .start_line = token_start_line,
-            .end_col = token_start_col + 1,
-            .end_line = token_start_line,
-            .contents = "",
-            .token = HighLevelTokens.EOF,
-        });
-        return error.EndOfStream;
-    }
-    if (token.?.token == LowLevelTokens.LineBreak) {
-        var next_token = low_level_tokens_parser.char();
-        if (next_token.?.token == LowLevelTokens.Hashtag) {
-            var header_count: u64 = 0;
+    var tokens = std.ArrayList(LowLevelLexToken).init(testing_allocator);
+    defer tokens.deinit();
 
-            while (low_level_tokens_parser.pos > low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
-                if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token != LowLevelTokens.Hashtag) {
-                    break;
-                } else {
-                    header_count += 1;
-                }
-            }
-            if (header_count > 6) { // Markdown can't have headings that are larger than 6 hashtags.
-                var combined_texts = std.ArrayList(u8).init(gpa);
-                // In this block it's text, so make sure that you go till the end of text.
+    get_tokens(&parser, &tokens) catch |err| {
+        try testing.expect(err == error.EndOfStream);
+        std.debug.print("[+] Successfully parsed the file.\n", .{});
+    };
 
-                // Adding the hashtags as text into the combined_texts
-                var header_count_copy = header_count;
-                while (header_count_copy > 0) : (header_count_copy -= 1) {
-                    try combined_texts.append('#');
-                }
-
-                while (low_level_tokens_parser.pos < low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
-                    if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token != LowLevelTokens.Identifier) {
-                        break;
-                    } else {
-                        try combined_texts.appendSlice(low_level_tokens_parser.buf[low_level_tokens_parser.pos].contents);
-                    }
-                }
-                try highTokens.append(HighLevelLexToken{
-                    .start_line = token_start_line,
-                    .start_col = token_start_col,
-                    .end_line = low_level_tokens_parser.peek(0).?.end_line,
-                    .end_col = low_level_tokens_parser.peek(0).?.end_col,
-                    .contents = try combined_texts.toOwnedSlice(),
-                    .token = HighLevelTokens.Text,
-                });
-                try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser, gpa);
-            } else {
-                if (low_level_tokens_parser.peek(1).?.token == LowLevelTokens.Space) {
-                    // Found a heading.
-
-                    var type_of_heading: HighLevelTokens = undefined;
-                    if (header_count == 1) {
-                        type_of_heading = HighLevelTokens.Heading1;
-                    } else if (header_count == 2) {
-                        type_of_heading = HighLevelTokens.Heading2;
-                    } else if (header_count == 3) {
-                        type_of_heading = HighLevelTokens.Heading3;
-                    } else if (header_count == 4) {
-                        type_of_heading = HighLevelTokens.Heading4;
-                    } else if (header_count == 5) {
-                        type_of_heading = HighLevelTokens.Heading5;
-                    } else if (header_count == 6) {
-                        type_of_heading = HighLevelTokens.Heading6;
-                    }
-
-                    // Traversing to the actual heading text.
-                    low_level_tokens_parser.pos += 2;
-
-                    var combined_texts = std.ArrayList(u8).init(gpa);
-
-                    while (low_level_tokens_parser.pos < low_level_tokens_parser.buf.len) : (low_level_tokens_parser.pos += 1) {
-                        if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.LineBreak) {
-                            break;
-                        } else if (low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.Identifier or low_level_tokens_parser.buf[low_level_tokens_parser.pos].token == LowLevelTokens.Space) {
-                            try combined_texts.appendSlice(low_level_tokens_parser.buf[low_level_tokens_parser.pos].contents);
-                        }
-                    }
-
-                    try highTokens.append(HighLevelLexToken{ .start_line = token_start_line, .start_col = token_start_col, .end_line = low_level_tokens_parser.peek(0).?.end_line, .end_col = low_level_tokens_parser.peek(0).?.end_col, .contents = try combined_texts.toOwnedSlice(), .token = type_of_heading });
-                } else {
-                    // TODO: If it's not a space, it's text.
-                }
-            }
-            // TODO: handle all the other possibilities that can happen only after new lines.
-            // } else if () {
-
-        } else {}
-    } else if (token.?.token == LowLevelTokens.Identifier) {
-        // TODO: collect all identifiers after this to one Text high level token.
-
-        var combined_texts = std.ArrayList(u8).init(gpa);
-
-        try combined_texts.appendSlice(token.?.contents);
-
-        while (true) {
-            var iterated_token = low_level_tokens_parser.char();
-
-            if (iterated_token.?.token == LowLevelTokens.EOF) {
-                low_level_tokens_parser.pos -= 1; // Going back one in position so that the next iteration will handle EOF.
-                try highTokens.append(HighLevelLexToken{
-                    .start_col = token_start_col,
-                    .start_line = token_start_line,
-                    .end_col = low_level_tokens_parser.peek(0).?.end_col,
-                    .end_line = low_level_tokens_parser.peek(0).?.end_line,
-                    .contents = try combined_texts.toOwnedSlice(),
-                    .token = HighLevelTokens.Text,
-                });
-            }
-
-            if (iterated_token.?.token == LowLevelTokens.Identifier or iterated_token.?.token == LowLevelTokens.Space) {
-                try combined_texts.appendSlice(iterated_token.?.contents);
-            } else {
-                break;
-            }
-        }
-        try highTokens.append(HighLevelLexToken{
-            .start_col = token_start_col,
-            .start_line = token_start_line,
-            .end_col = low_level_tokens_parser.peek(0).?.end_col,
-            .end_line = low_level_tokens_parser.peek(0).?.end_line,
-            .contents = try combined_texts.toOwnedSlice(),
-            .token = HighLevelTokens.Text,
-        });
-        try traverse_and_form_high_level_tokens(highTokens, low_level_tokens_parser, gpa);
-    }
+    try testing.expect(tokens.items[0].token == TokenTypes.Identifier);
 }
