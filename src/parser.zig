@@ -77,11 +77,13 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                 while (parser.peek(peek_amount) == '#') : (peek_amount += 1) {
                     header_amount += 1;
                 }
-                if (header_amount <= 6 and parser.peek(peek_amount + 1) == ' ') {
+
+                if (header_amount < 7 and parser.peek(peek_amount + 1) == ' ') {
                     heading_ahead = true;
                 }
 
                 if (heading_ahead) {
+                    // TODO: why are we never getting into this branch?
                     parser.pos += peek_amount;
 
                     // @Copypasta
@@ -102,6 +104,7 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                     //
 
                     std.debug.print("Found heading with {} hashtags. Contents of heading: {s}", .{ header_amount, parser.buf[text_start_pos..end_pos] });
+                    try get_tokens(parser, tokens);
                 } else {
                     // @Copypasta
                     while (true) {
@@ -119,6 +122,7 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                     //
                     std.debug.print("Found text with {} hashtags. Contents of text: {s}\n", .{ header_amount, parser.buf[start_pos..end_pos] });
                     try capture_token(tokens, @constCast(parser.buf[start_pos..end_pos]), TokenTypes.Identifier, start_line, start_col);
+                    try get_tokens(parser, tokens);
                 }
                 // std.debug.print("Found hashtags, got {} hashtags. heading_ahead = {}\n", .{ header_amount, heading_ahead });
             }
