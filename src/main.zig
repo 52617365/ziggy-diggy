@@ -26,8 +26,8 @@ pub fn main() !void {
     }
 
     var file_contents = file.LoadFileIntoMemory(file_name.items, gpa) catch |err| {
-        var message = custom_errors.FetchCustomErrorMessage(err, custom_errors.AllCustomErrorMessages);
-        std.debug.print("[-] {s}", .{message});
+        // var message = custom_errors.FetchCustomErrorMessage(err, custom_errors.AllCustomErrorMessages);
+        std.debug.print("[-] {any}", .{err});
         return;
     };
     defer file_contents.deinit();
@@ -48,12 +48,4 @@ pub fn main() !void {
     // for (tokens.items) |token| {
     //     std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
     // }
-}
-
-fn free_high_level_tokens(gpa: std.mem.Allocator, tokens: []parser_utils.HighLevelLexToken) void {
-    for (tokens) |token| {
-        if (token.token == parser_utils.HighLevelTokens.Text) {
-            gpa.free(token.contents);
-        }
-    }
 }

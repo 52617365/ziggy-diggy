@@ -69,8 +69,10 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
         col = 0;
 
         var start_pos = parser.pos;
+
+        // Heading scope.
         {
-            if (parser.peek(1) == '#') {
+            if (parser.peek(0) == '#') {
                 var heading_ahead = false;
                 var header_amount: u64 = 1;
                 var peek_amount: u64 = 1;
@@ -78,16 +80,15 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                     header_amount += 1;
                 }
 
-                if (header_amount < 7 and parser.peek(peek_amount + 1) == ' ') {
+                if (header_amount < 7 and parser.peek(peek_amount) == ' ') {
                     heading_ahead = true;
                 }
 
                 if (heading_ahead) {
-                    // TODO: why are we never getting into this branch?
                     parser.pos += peek_amount;
 
                     // @Copypasta
-                    var text_start_pos = parser.pos;
+                    var text_start_pos = parser.pos + 1; // Skipping the white space to get to the actual text.
 
                     while (true) {
                         if (parser.pos >= parser.buf.len) break;
@@ -103,7 +104,29 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                     var end_pos = parser.pos;
                     //
 
-                    std.debug.print("Found heading with {} hashtags. Contents of heading: {s}", .{ header_amount, parser.buf[text_start_pos..end_pos] });
+                    var heading_type: TokenTypes = undefined;
+                    if (header_amount == 1) {
+                        heading_type = TokenTypes.Heading1;
+                        std.debug.print("Hit the heading1 branch\n", .{});
+                    }
+                    if (header_amount == 2) {
+                        heading_type = TokenTypes.Heading2;
+                    }
+                    if (header_amount == 3) {
+                        heading_type = TokenTypes.Heading3;
+                    }
+                    if (header_amount == 4) {
+                        heading_type = TokenTypes.Heading4;
+                    }
+                    if (header_amount == 5) {
+                        heading_type = TokenTypes.Heading5;
+                    }
+                    if (header_amount == 6) {
+                        heading_type = TokenTypes.Heading6;
+                    }
+
+                    try capture_token(tokens, @constCast(parser.buf[text_start_pos..end_pos]), heading_type, start_line, start_col);
+                    std.debug.print("Found heading with {} hashtags. Contents of heading: {s}\n", .{ header_amount, parser.buf[text_start_pos..end_pos] });
                     try get_tokens(parser, tokens);
                 } else {
                     // @Copypasta
@@ -120,11 +143,9 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
 
                     var end_pos = parser.pos;
                     //
-                    std.debug.print("Found text with {} hashtags. Contents of text: {s}\n", .{ header_amount, parser.buf[start_pos..end_pos] });
                     try capture_token(tokens, @constCast(parser.buf[start_pos..end_pos]), TokenTypes.Identifier, start_line, start_col);
                     try get_tokens(parser, tokens);
                 }
-                // std.debug.print("Found hashtags, got {} hashtags. heading_ahead = {}\n", .{ header_amount, heading_ahead });
             }
         }
 
@@ -301,6 +322,12 @@ pub const TokenTypes = enum {
     SmallerThan, // <
     LargerThan, // >
     Pipe, // |
+    Heading1, // #
+    Heading2, // ##
+    Heading3, // ###
+    Heading4, // ####
+    Heading5, // #####
+    Heading6, // ######
 };
 
 test "test build low level tokens" {
