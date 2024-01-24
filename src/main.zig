@@ -44,8 +44,8 @@ pub fn main() !void {
         }
     };
 
-    // std.debug.print("\n[+] Low level tokens:\n", .{});
-    // for (tokens.items) |token| {
-    //     std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
-    // }
+    std.debug.print("\n[+] Low level tokens:\n", .{});
+    for (tokens.items) |token| {
+        std.debug.print("Token: {any}, content as string: '{s}'\n", .{ token, token.contents });
+    }
 }
