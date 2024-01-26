@@ -171,8 +171,37 @@ pub fn get_tokens(parser: *llParser, tokens: *std.ArrayList(LowLevelLexToken)) !
                 try capture_token(tokens, @constCast(parser.buf[start_of_blockquote_text..end_pos]), TokenTypes.Blockquote, start_line, start_col);
                 try get_tokens(parser, tokens);
             }
-        }
+        } else if (is_number(parser.peek(0))) {
+            var is_ordered_list = false;
 
+            if (parser.peek(1) == '.') {
+                if (parser.peek(2) == ' ') {
+                    is_ordered_list = true;
+                }
+            }
+
+            if (is_ordered_list) {
+                parser.pos += 3; // Increment to start of the ordered list text.
+
+                // @Copypasta
+                var start_of_ordered_list = parser.pos;
+                while (true) {
+                    if (parser.pos >= parser.buf.len) break;
+
+                    if (!is_unicode_identifier(parser.buf[parser.pos]) and !is_number(parser.buf[parser.pos]) and !is_symbol(parser.buf[parser.pos])) {
+                        break;
+                    }
+
+                    parser.pos += 1;
+                    col += 1;
+                }
+
+                var end_pos = parser.pos;
+                //
+                try capture_token(tokens, @constCast(parser.buf[start_of_ordered_list..end_pos]), TokenTypes.OrderedList, start_line, start_col);
+                try get_tokens(parser, tokens);
+            }
+        }
         try get_tokens(parser, tokens);
     } else if (char.? == ' ') {
         try capture_token(tokens, @constCast(" "), TokenTypes.Space, start_line, start_col);
@@ -312,8 +341,9 @@ fn is_symbol(c: u8) bool {
     };
 }
 
-fn is_number(c: u8) bool {
-    return c >= '0' and c <= '9';
+fn is_number(c: ?u8) bool {
+    if (c == null) return false;
+    return c.? >= '0' and c.? <= '9';
 }
 
 fn is_unicode_identifier_or_number(c: ?u8) bool {
